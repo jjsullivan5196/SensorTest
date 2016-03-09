@@ -13,12 +13,21 @@ import android.hardware.SensorManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.content.Context;
+import android.widget.Button;
 import android.widget.TextView;
+import java.io.File;
+
+import java.io.FileOutputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 
 public class SensorTest extends AppCompatActivity implements SensorEventListener {
     private SensorManager mSensorManager;
-    private Sensor gyro;
-    private TextView x, y, z;
+    private TextView xrot, yrot, zrot, xacc, yacc, zacc;
+    private boolean record;
+    private OutputStreamWriter gyroStream;
+    private OutputStreamWriter accStream;
+    private Button go;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -27,12 +36,39 @@ public class SensorTest extends AppCompatActivity implements SensorEventListener
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        mSensorManager = (SensorManager)getSystemService(Context.SENSOR_SERVICE);
-        gyro = mSensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
+        record = false;
 
-        x = (TextView)findViewById(R.id.xval);
-        y = (TextView)findViewById(R.id.yval);
-        z = (TextView)findViewById(R.id.zval);
+        mSensorManager = (SensorManager)getSystemService(Context.SENSOR_SERVICE);
+
+        xrot = (TextView)findViewById(R.id.xval);
+        yrot = (TextView)findViewById(R.id.yval);
+        zrot = (TextView)findViewById(R.id.zval);
+
+        xacc = (TextView)findViewById(R.id.xaval);
+        yacc = (TextView)findViewById(R.id.yaval);
+        zacc = (TextView)findViewById(R.id.zaval);
+
+        go = (Button)findViewById(R.id.button_go);
+        go.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view){
+                if(!record) {
+                    try {
+                        gyroStream = new OutputStreamWriter(openFileOutput(("gyro" + Long.toString(System.currentTimeMillis()/1000) + ".csv"), Context.MODE_PRIVATE));
+                        accStream = new OutputStreamWriter(openFileOutput(("acc" + Long.toString(System.currentTimeMillis()/1000) + ".csv"), Context.MODE_PRIVATE));
+                    }
+                    catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    record = true;
+                    go.setText("Stop");
+                }
+                else if(record) {
+                    record = false;
+                    go.setText("Go");
+                }
+            }
+        });
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
@@ -51,9 +87,32 @@ public class SensorTest extends AppCompatActivity implements SensorEventListener
 
     @Override
     public final void onSensorChanged(SensorEvent event) {
-        x.setText(Float.toString(event.values[0]));
-        y.setText(Float.toString(event.values[1]));
-        z.setText(Float.toString(event.values[2]));
+        Sensor sensor = event.sensor;
+        if(sensor.getType() == Sensor.TYPE_GYROSCOPE) {
+            //Super-duper CSV writer ft. Java
+            String writeline = Float.toString(event.values[0]) + ',' + Float.toString(event.values[1]) + ',' + Float.toString(event.values[2]) + "\n";
+            xrot.setText(Float.toString(event.values[0]));
+            yrot.setText(Float.toString(event.values[1]));
+            zrot.setText(Float.toString(event.values[2]));
+            try {
+                if (record) gyroStream.write(writeline);
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        else if(sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+            String writeline = Float.toString(event.values[0]) + ',' + Float.toString(event.values[1]) + ',' + Float.toString(event.values[2]) + "\n";
+            xacc.setText(Float.toString(event.values[0]));
+            yacc.setText(Float.toString(event.values[1]));
+            zacc.setText(Float.toString(event.values[2]));
+            try {
+                if (record) accStream.write(writeline);
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     @Override
@@ -81,12 +140,14 @@ public class SensorTest extends AppCompatActivity implements SensorEventListener
     @Override
     protected void onResume() {
         super.onResume();
-        mSensorManager.registerListener(this, gyro, SensorManager.SENSOR_DELAY_GAME);
+        mSensorManager.registerListener(this, mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE), SensorManager.SENSOR_DELAY_GAME);
+        mSensorManager.registerListener(this, mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_GAME);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        mSensorManager.unregisterListener(this);
+        mSensorManager.unregisterListener(this, mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE));
+        mSensorManager.unregisterListener(this, mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER));
     }
 }
